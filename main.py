@@ -1,15 +1,16 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
+from fastapi.responses import HTMLResponse
 import httpx
 import json
 import logging
-from dotenv import load_dotenv
 import os
+from modal import Image, App, asgi_app
+import modal
 
-load_dotenv()  # take environment variables from .env.
+web_app = FastAPI()
+app = App("llm_proxy")
 
-LLM_URL = os.getenv("LLM_URL")
-
-app = FastAPI()
+image = Image.debian_slim().pip_install("httpx")
 
 logging.basicConfig(level=logging.CRITICAL)
 
@@ -30,9 +31,8 @@ def parse_hume_message(messages_payload: dict) -> str:
 
         return last_user_message
 
-
-@app.websocket("/llm_proxy")
-async def llm_proxy_endpoint(websocket: WebSocket, llm_url: str = LLM_URL):
+@web_app.websocket("/llm_proxy")
+async def llm_proxy_endpoint(websocket: WebSocket):
     """
     Handles incoming WebSocket connections and proxies the messages to a remote LLM endpoint.
 
@@ -56,6 +56,9 @@ async def llm_proxy_endpoint(websocket: WebSocket, llm_url: str = LLM_URL):
     """
     # Accept the incoming WebSocket connection.
     await websocket.accept()
+    
+    llm_url = os.getenv("LLM_URL")
+    
     # Continuously listen for messages from the WebSocket connection.
     while True:
         # Wait for a text message from the WebSocket, then asynchronously receive it.
@@ -82,3 +85,8 @@ async def llm_proxy_endpoint(websocket: WebSocket, llm_url: str = LLM_URL):
         
         for response in responses:
             await websocket.send_text(response)
+
+@app.function(image=image, secrets=[modal.Secret.from_name("llm_url")])
+@asgi_app()
+def fastapi_app():
+    return web_app
