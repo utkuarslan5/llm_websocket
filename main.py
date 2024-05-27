@@ -2,8 +2,12 @@ from fastapi import FastAPI, WebSocket
 import httpx
 import json
 import logging
+from dotenv import load_dotenv
+import os
 
-LLM_URL = "https://flowiseai-railway-production-dd26.up.railway.app/api/v1/prediction/49824ea4-9fb4-4480-b651-611cd1c9c29e"
+load_dotenv()  # take environment variables from .env.
+
+LLM_URL = os.getenv("LLM_URL")
 
 app = FastAPI()
 
